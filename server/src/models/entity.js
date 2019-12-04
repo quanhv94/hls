@@ -30,8 +30,8 @@ EntitySchema.virtual('app', {
   localField: 'appId',
   foreignField: '_id',
 });
-EntitySchema.virtual('playlistUrl', function () {
-  return this.playlistPath ? `http://rabita.vn/${this.playlistPath}` : null;
+EntitySchema.virtual('playlistUrl').get(function () {
+  return this.playlistPath ? `http://1351295534.rsc.cdn77.org//${this.playlistPath}` : null;
 });
 
 const Entity = mongoose.model('Entity', EntitySchema);

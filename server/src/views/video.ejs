@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>HLS Demo</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/plyr/3.5.6/plyr.css">
+  <style>
+    body {
+      background: #000;
+    }
+    .not-found {
+      color: #fff;
+      text-align: center;
+    }
+    #video {
+      width: 100vw;
+      height: 100vh;
+    }
+    <% if (timeshift === '0') { %>
+    .plyr__progress {
+      pointer-events: none !important;
+      opacity: 0.3;
+    }
+    <% } %>
+  </style>
+</head>
+
+<body>
+<% if (entity) { %>
+  <video id="video" preload="none" playsinline="playsinline" controls data-playlist-url="<%- entity.playlistUrl %>"></video>
+<% } else { %>
+  <h2 class="not-found">Video not found!</h2>
+<% } %>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/plyr/3.5.6/plyr.js"></script>
+  <script src="https://cdn.jsdelivr.net/hls.js/latest/hls.js"></script>
+  <script>
+    (function () {
+      var video = document.querySelector('#video');
+      var iframeId = '<%= iframeId %>';
+      if (Hls.isSupported()) {
+        var hls = new Hls();
+        hls.loadSource(video.dataset.playlistUrl);
+        hls.attachMedia(video);
+      }
+      var controls = ['play', 'progress', 'current-time', 'mute', 'volume', 'settings', 'fullscreen'];
+      <% if (fullscreen === '0') { %>
+      controls = controls.filter((x) =>x !== 'fullscreen');
+      <% } %>
+      var player = new Plyr(video, {
+        settings: [],
+        controls,
+        invertTime: false,
+      });
+
+      const getVideoData = ({ type }) => ({
+        currentTime: video.currentTime,
+        remainingTime: video.duration - video.currentTime,
+        type,
+      });
+      const postMessage = (data) => {
+        data = { ...data, iframeId };
+        window.parent.postMessage(JSON.stringify(data), '*');
+      };
+
+      video.addEventListener('loadedmetadata', () => {
+        postMessage(getVideoData({ type: 'ready' }));
+      });
+      video.addEventListener('play', () => {
+        postMessage(getVideoData({ type: 'play' }));
+      });
+      video.addEventListener('pause', () => {
+        postMessage(getVideoData({ type: 'pause' }));
+      });
+      video.addEventListener('ended', () => {
+        postMessage(getVideoData({ type: 'ended' }));
+      });
+      video.addEventListener('timeupdate', () => {
+        postMessage(getVideoData({ type: 'timeupdate' }));
+      });
+      window.addEventListener('message', (event) => {
+        const data = JSON.parse(event.data);
+        if(data.type === 'play') {
+          if(!isNaN(data.time)) {
+            video.currentTime = data.time;
+          }
+          video.play();
+        } else if (data.type === 'pause') {
+          video.pause();
+        } else if (data.type === 'mute') {
+          video.muted = true;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

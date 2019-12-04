@@ -1,4 +1,5 @@
 import Agenda from 'agenda';
+import { Client } from 'basic-ftp';
 import mkdirp from 'mkdirp-promise';
 import fs from 'fs-extra';
 import ffmpeg from 'fluent-ffmpeg';
@@ -23,36 +24,66 @@ agenda.define('process entity', { priority: 10 }, async (job, done) => {
   if (entity.status !== entityStatuses.pending) {
     return done();
   }
-  entity.status = entityStatuses.inprogress;
-  await entity.save();
-  const tmpFolder = `tmp/${entity.id}`;
-  await mkdirp(tmpFolder);
+  const tmpFolder = `${constants.env}/videos/${entity.id}`;
   const filePath = `${tmpFolder}/${entity.id}`;
-  const playlistPath = `${tmpFolder}/${entity.id}.m3u8`;
-  await streamDownload({ uri: entity.sourceUrl, savePath: filePath });
-  const duration = await getVideoDurationInSeconds(filePath);
-  console.log('Duration', duration);
-  entity.duration = duration;
-  await entity.save();
-  await (new Promise((resolve, reject) => {
-    ffmpeg(filePath, { timeout: 432000 }).addOptions([
-      '-profile:v baseline', // baseline profile (level 3.0) for H264 video codec
-      '-level 3.0',
-      // '-s 10x80',
-      '-start_number 0', // start the first .ts segment at index 0
-      '-hls_time 10', // 10 second segment duration
-      '-hls_list_size 0', // Maxmimum number of playlist entries (0 means all entries/infinite)
-      '-f hls', // HLS format
-    ]).output(playlistPath)
-      .on('end', resolve)
-      .on('progress', (progress) => console.log(`Convert progress: ${progress.percent}%`))
-      .on('error', reject)
-      .run();
-  }));
-  await fs.remove(filePath);
-  // await fs.remove(tmpFolder);
-  console.log(`Finish: process entity, entityId: ${entityId}`);
-  return done();
+
+  try {
+    entity.status = entityStatuses.inprogress;
+    await entity.save();
+    await mkdirp(tmpFolder);
+    // Download file
+    await streamDownload({ uri: entity.sourceUrl, savePath: filePath });
+    const duration = await getVideoDurationInSeconds(filePath);
+    console.log('Duration', duration);
+    entity.duration = duration;
+    await entity.save();
+    // Convert video to hls
+    const playlistPath = `${tmpFolder}/${entity.id}.m3u8`;
+    await (new Promise((resolve, reject) => {
+      ffmpeg(filePath, { timeout: 432000 }).addOptions([
+        '-profile:v baseline', // baseline profile (level 3.0) for H264 video codec
+        '-level 3.0',
+        // '-s 10x80',
+        '-start_number 0', // start the first .ts segment at index 0
+        '-hls_time 10', // 10 second segment duration
+        '-hls_list_size 0', // Maxmimum number of playlist entries (0 means all entries/infinite)
+        '-f hls', // HLS format
+      ]).output(playlistPath)
+        .on('end', resolve)
+        .on('progress', (progress) => console.log(`Convert progress: ${progress.percent}%`))
+        .on('error', reject)
+        .run();
+    }));
+    await fs.remove(filePath);
+
+    // Upload to CDN
+    const client = new Client();
+    client.ftp.verbose = true;
+    await client.access({
+      host: constants.cdnServer.host,
+      user: constants.cdnServer.user,
+      password: constants.cdnServer.password,
+      secure: false,
+    });
+    client.ftp.verbose = true;
+    await client.ensureDir(`www/${tmpFolder}`);
+    await client.clearWorkingDir();
+    await client.uploadFromDir(tmpFolder);
+    client.close();
+    entity.status = entityStatuses.success;
+    entity.playlistPath = playlistPath;
+    await entity.save();
+    console.log(`Finish: process entity, entityId: ${entityId}`);
+    return done();
+  } catch (error) {
+    entity.status = entityStatuses.error;
+    await entity.save();
+    console.log(`Error: process entity, entityId: ${entityId}`, error);
+    return done(error);
+  } finally {
+    // Clean processed files
+    await fs.remove(tmpFolder);
+  }
 });
 
 

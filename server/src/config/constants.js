@@ -19,6 +19,11 @@ const constants = {
     appId: '799017060213',
     clientId: '799017060213-1m83kb7gn98p6iqt5u9gnf2lfs8nl4ps.apps.googleusercontent.com',
   },
+  cdnServer: {
+    host: 'push-30.cdn77.com',
+    user: 'user_bll5egmj',
+    password: 'eNJoOIlnWZdl2Hz2ngiz',
+  },
 };
 
 export default constants;

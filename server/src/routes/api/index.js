@@ -13,7 +13,6 @@ router.use((req, res, next) => {
 
 // api v1 routing
 router.use('/v1', apiV1Router);
-
 // global error handing
 router.use((error, req, res, next) => {
   if (!error) next();
