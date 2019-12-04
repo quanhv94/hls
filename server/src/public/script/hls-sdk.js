@@ -65,7 +65,9 @@
 
     window.addEventListener('message', (event) => {
       const data = JSON.parse(event.data);
-      player.emit(data.type, data);
+      if (data.iframeId === iframeId) {
+        player.emit(data.type, data);
+      }
     });
 
     if (typeof (playerCallback) === 'function') {
