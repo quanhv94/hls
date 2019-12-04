@@ -31,7 +31,7 @@ EntitySchema.virtual('app', {
   foreignField: '_id',
 });
 EntitySchema.virtual('playlistUrl').get(function () {
-  return this.playlistPath ? `http://1351295534.rsc.cdn77.org//${this.playlistPath}` : null;
+  return this.playlistPath ? `http://1351295534.rsc.cdn77.org/${this.playlistPath}` : null;
 });
 
 const Entity = mongoose.model('Entity', EntitySchema);
