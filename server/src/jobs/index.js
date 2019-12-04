@@ -27,6 +27,9 @@ agenda.define('process entity', { priority: 10 }, async (job, done) => {
   const tmpFolder = `${constants.env}/videos/${entity.id}`;
   const filePath = `${tmpFolder}/${entity.id}`;
 
+  const client = new Client(0);
+  client.ftp.verbose = constants.env === 'dev';
+
   try {
     entity.status = entityStatuses.inprogress;
     await entity.save();
@@ -57,8 +60,6 @@ agenda.define('process entity', { priority: 10 }, async (job, done) => {
     await fs.remove(filePath);
 
     // Upload to CDN
-    const client = new Client();
-    client.ftp.verbose = true;
     await client.access({
       host: constants.cdnServer.host,
       user: constants.cdnServer.user,
@@ -69,7 +70,6 @@ agenda.define('process entity', { priority: 10 }, async (job, done) => {
     await client.ensureDir(`www/${tmpFolder}`);
     await client.clearWorkingDir();
     await client.uploadFromDir(tmpFolder);
-    client.close();
     entity.status = entityStatuses.success;
     entity.playlistPath = playlistPath;
     await entity.save();
@@ -83,6 +83,7 @@ agenda.define('process entity', { priority: 10 }, async (job, done) => {
   } finally {
     // Clean processed files
     await fs.remove(tmpFolder);
+    client.close();
   }
 });
 

@@ -3,7 +3,7 @@ import App from '../app';
 
 const createDefaultApp = async () => {
   if ((await App.countDocuments()) === 0) {
-    App.create({
+    await App.create({
       name: 'Rabita',
       token: uuid(),
     }, {
